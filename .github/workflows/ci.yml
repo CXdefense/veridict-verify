@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify-demo-bundle:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: pip install .
+      - name: Verify demo bundle (integrity must hold)
+        shell: bash
+        run: |
+          set +e
+          veridict-verify examples/demo.veridict.zip --json
+          code=$?
+          set -e
+          # 0 = VALID, 2 = VALID WITH WARNINGS (pending timestamps in the demo).
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            echo "verifier reported INVALID or crashed (exit $code)"
+            exit 1
+          fi
+      - name: Tampered bundle must fail
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import shutil, zipfile
+          shutil.copy("examples/demo.veridict.zip", "tampered.veridict.zip")
+          # append a byte to the first stored object to break its hash
+          import os
+          with zipfile.ZipFile("tampered.veridict.zip") as z:
+              names = [n for n in z.namelist() if "/objects/" in n or n.startswith("objects")]
+              data = {n: z.read(n) for n in z.namelist()}
+          target = names[0]
+          data[target] = data[target] + b"X"
+          with zipfile.ZipFile("tampered.veridict.zip", "w") as z:
+              for n, b in data.items():
+                  z.writestr(n, b)
+          EOF
+          set +e
+          veridict-verify tampered.veridict.zip
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "tampered bundle was NOT flagged INVALID (exit $code)"
+            exit 1
+          fi
+          echo "tamper detected correctly"
