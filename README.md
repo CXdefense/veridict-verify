@@ -73,14 +73,28 @@ See [docs/key-policy.md](docs/key-policy.md) for custody and publication guidanc
 - [Bundle format specification](docs/bundle-format.md)
 - [Key policy: custody, publication, rotation](docs/key-policy.md)
 
+## Conformance tests
+
+`tests/` contains an engine-independent conformance suite: a committed valid
+bundle plus five tampered variants (flipped object byte, forged record,
+deleted record, forged manifest head, swapped public key). Run it yourself:
+
+```bash
+pip install . pytest
+pytest tests -q
+```
+
+Every tampered fixture must come back `INVALID`. See
+[tests/fixtures/README.md](tests/fixtures/README.md) for the corpus.
+
 ## Relationship to the VERIDICT engine
 
 The engine that *builds* cases (capture, sealing, AI-assisted analysis,
 reporting) is developed separately. This verifier is intentionally
 independent so that opposing counsel, auditors, and editors can re-check
-conclusions without trusting — or even having — the engine. Conformance
-tests that exercise the verifier against engine-produced bundles run in the
-engine's CI on every commit.
+conclusions without trusting — or even having — the engine. A larger
+engine-coupled test suite additionally runs in the engine's CI on every
+commit.
 
 ## License
 

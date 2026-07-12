@@ -16,7 +16,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install package
-        run: pip install .
+        run: pip install . pytest
+      - name: Conformance tests (engine-independent)
+        run: pytest tests -q
       - name: Verify demo bundle (integrity must hold)
         shell: bash
         run: |
