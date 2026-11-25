@@ -1449,6 +1449,9 @@ def _verify_tree(
         from veridict_verify.tree import compare_tree
 
         inventories = [a for a in artifacts if a.get("capture_method") == "folder-inventory/1"]
+        level_two = [a for a in artifacts if a.get("capture_method") == "folder-inventory/2"]
+        if level_two and not inventories:
+            inventories = level_two[-1:]
         if len(inventories) != 1:
             report.error("tree", "expected one sealed folder inventory", code="tree.inventory_count")
         else:
