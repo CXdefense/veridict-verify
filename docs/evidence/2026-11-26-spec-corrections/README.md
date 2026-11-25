@@ -15,9 +15,10 @@ the engine owner. Nothing in this package changes, and neither does its version.
 | `03-verifier-versions.png` | Which rows of the version table the check scripts tested and which come from reading the code; the `--check-tree` cell for 0.3.0 |
 | `04-known-gaps.png` | The new **Known gaps** subsection |
 | `05-tests.png` | This package's tests and every conformance case, on this branch |
+| `06-check-tree.png` | The inventory byte format, and which errors stop `--check-tree`: only those from the checks that run before it (archive, manifest, journal, artifacts), with the lines of this package's verifier that set the order |
 
 The other corrections (manifest rows, times, the `contradicts` and `supersedes` edge
-types, the `human/` prefix, register rows, inventory bytes and `--check-tree`) are in
-the same diff. Each screenshot is plain-text output in a terminal style under a
-one-line caption (Edge via Playwright). The text was not edited, except that
-screenshot 1 leaves out the engine-side lines of the comparison.
+types, the `human/` prefix, register rows) are in the same diff. Each screenshot is
+plain-text output in a terminal style under a one-line caption (Edge via Playwright).
+The text was not edited, except that screenshot 1 leaves out the engine-side lines of
+the comparison.

@@ -339,15 +339,18 @@ are UTF-8 with one line per file: the SHA-256 as 64 lowercase hex, two spaces, t
 relative path, LF. Paths use `/`, have no empty, `.` or `..` segment and no
 duplicates, and are sorted by Unicode code point; the last line ends with LF.
 
-**`--check-tree`** runs only when the bundle has no other error; after an earlier error
-the folder is not compared and no `tree` finding appears. It walks FOLDER and skips
-files whose name starts with `~$` or is `thumbs.db`, `desktop.ini` or `.ds_store` in
-any letter case (the engine skips the same names when it seals). Each difference is a
-`tree.mismatch` error (`added: P`, `changed: P`, `missing: P`). A malformed inventory,
-a link, reparse point or offline placeholder, any other non-regular entry, two names
-that are equal after NFC normalisation and case folding, or a file that changes while
-it is read is `tree.unreadable`. Anything other than exactly one selected inventory is
-`tree.inventory_count`.
+**`--check-tree`** runs only when the archive, manifest, journal (record signatures and
+`chain_timestamp` included) and artifact (hashes and content seals) checks found no
+error; after such an error the folder is not compared and no `tree` finding appears.
+The graph-semantics, corroboration, Source Brief, per-artifact timestamp and
+`--forbid-ai-steps` checks run after it, so their errors do not stop it. It walks
+FOLDER and skips files whose name starts with `~$` or is `thumbs.db`, `desktop.ini` or
+`.ds_store` in any letter case (the engine skips the same names when it seals). Each
+difference is a `tree.mismatch` error (`added: P`, `changed: P`, `missing: P`). A
+malformed inventory, a link, reparse point or offline placeholder, any other
+non-regular entry, two names that are equal after NFC normalisation and case folding,
+or a file that changes while it is read is `tree.unreadable`. Anything other than
+exactly one selected inventory is `tree.inventory_count`.
 
 ## Source Brief steps
 
