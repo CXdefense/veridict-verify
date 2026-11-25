@@ -54,15 +54,15 @@ byte-level change anywhere breaks the chain.
 | Field | Meaning |
 |-------|---------|
 | `spec` | `veridict-bundle/2` (or `/1`) |
-| `case` | a copy of `case.json`. In an enrolled case (see **Signer profiles**) it carries `signer_policy: "enrolled/1"` and `investigator_agent`, the founding agent's id |
+| `case` | a copy of `case.json`: `spec`, `case_id`, `name`, `created_at`, `tool_version` and `investigator_agent` (the founding agent's id, in every case). In an enrolled case (see **Signer profiles**) it also carries `signer_policy: "enrolled/1"` |
 | `created_at` | when this manifest was written (engine clock, RFC 3339 UTC) |
 | `chain_head` | `chain_hash` of the last log record |
 | `record_count` | number of log records |
-| `public_keys` | `{key id: base64 raw 32-byte Ed25519 public key}`: the exporting key, keys announced by `human/key-rotation` steps, the investigator agent's key and, in an enrolled case, every enrolled agent's key and every key a record declares in `signer_public`. A record signed by a key missing here is reported as an unknown signer |
+| `public_keys` | `{key id: base64 raw 32-byte Ed25519 public key}`: the exporting key, keys announced by `human/key-rotation` steps, the investigator agent's key, every key a record declares in `signer_public` (in either profile), the key a step in a `batch` record carries in `params.signer_public` (captures write it) when it matches that record's `signer` and, in an enrolled case, every enrolled agent's key. A record signed by a key missing here is reported as an unknown signer |
 | `signers` | enrolled cases only: `{key id: {agent, kind, first, last, records}}` — the agent the key was enrolled for, `human` or `system`, the `seq` of the first and last record it signed and how many (`null`, `null`, `0` for a key that has not signed yet) |
 | `artifacts` | `[{id, sha256, path}]`, one per Artifact node; `path` is the canonical content address |
 | `counts` | `{artifacts, claims, steps, agents}` |
-| `chain_timestamp` | optional: `{path: "timestamps/chain-head.tsr", sha256}` and, when the timestamp transport returned one, `egress_ref` — one RFC 3161 token over the journal head (see **Timestamps**) |
+| `chain_timestamp` | optional: `{path: "timestamps/chain-head.tsr", sha256}` (`sha256` is the token file's digest as 64 lowercase hex, without a `sha256:` prefix) and, when the timestamp transport returned one, `egress_ref` — one RFC 3161 token over the journal head (see **Timestamps**) |
 | `manifest_hash` | `hash()` of the manifest without `manifest_hash` and `manifest_signature` |
 | `manifest_signature` | `{signer: key id, sig}` or absent/`null` (unsigned) |
 
@@ -91,9 +91,10 @@ shows only that the bytes were not changed after signing by *some* key listed in
 bundle; anyone can produce such a bundle, and the verifier says identity was not
 checked. **With a pinned key** (`--trusted-key`) every record and the manifest must be
 signed, and every signer must be a pinned key or a key that a pinned key handed over
-to in a valid rotation statement earlier in the chain — or, in an enrolled case, a key
-enrolled earlier in the chain by a trusted human (see **Signer profiles**). A signature
-never shows that a claim is true.
+to in a valid rotation statement — or, in an enrolled case, a key enrolled by a trusted
+human (see **Signer profiles**). A record signer that is not pinned must have been
+introduced earlier in the chain; for the other signatures see **Pinned keys** under
+**Verifier obligations**. A signature never shows that a claim is true.
 
 ## Signer profiles
 
@@ -117,9 +118,12 @@ every key is introduced inside the journal. Level-two folder imports always use 
    `system`. A system key cannot enroll anyone. A replacement key is enrolled the same
    way; `keys rotate` refuses an enrolled case.
 3. **Every record** after `seq 0` is signed by a key enrolled in an *earlier* record.
-4. **Steps.** A step whose `agent` is a human agent must be signed by that human's own
-   key. A step may name a system agent (with or without a key) or no agent at all
-   (`veridict/recovery`).
+4. **Steps.** If a step's `agent` is present and not `null`, it must be the id of an
+   `agent` node that appears in an earlier record or earlier in the same batch;
+   otherwise the error is `keys.not_trusted`. If that agent is human, the record must be
+   signed by the key enrolled for that same agent. A step may name a system agent (with
+   or without a key) or no agent at all (`veridict/recovery`). The rule looks at
+   `agent` only, not at the `tool` name (see **Known gaps**).
 5. **Human verification.** A `verified-by` edge must point at the signer's own enrolled
    human agent, and `meta.signer` must be the record's signer. A system key cannot
    verify a claim.
@@ -131,9 +135,10 @@ become trusted the way a rotation hands over trust, so the recipient does not ne
 pin the second analyst or the system account. Without a pin the rules are still
 checked, but nothing ties the founding key to a person.
 
-A record whose signer is not the founding key carries that signer's public key in
-`signer_public`. The engine refuses to export a record whose `signer_public` does not
-match its `signer`; the verifier reads keys from `public_keys`.
+In either profile, a record whose signer is not the founding investigator's key (a
+second analyst, a system account, a key after a rotation) carries that signer's public
+key in `signer_public`. The engine refuses to export a record whose `signer_public`
+does not match its `signer`; the verifier reads keys from `public_keys` only.
 
 ## Canonicalization
 
@@ -211,8 +216,13 @@ hand they can be days apart, and the difference must stay visible. Only the seal
 (as the engine's own record) and a verified token are *attested*; acquisition and
 source times are *stated* or *recorded by a tool* and must be presented that way.
 
-All times are RFC 3339 in UTC with a `Z` suffix, second precision (for example
-`2026-11-25T18:12:49Z`). Format-2 verifiers check only that `captured_at` is a string.
+Times the engine takes from its clock for nodes, records and the manifest
+(`created_at`, `captured_at`, `signed_at`, `sealed_at`) are RFC 3339 in UTC with a `Z`
+suffix, second precision (for example `2026-11-25T18:12:49Z`). Analyst-stated times,
+such as the register's own columns and `analyst_reported_at`, are kept as the analyst
+wrote them. A level-two import's `imported_at` (in the `folder-catalog/2` content and
+the `import-receipt/1` text) currently carries microseconds and `+00:00` instead (see
+**Known gaps**). Format-2 verifiers check only that `captured_at` is a string.
 
 ## Edge types
 
@@ -223,6 +233,11 @@ All times are RFC 3339 in UTC with a `Z` suffix, second precision (for example
 | `verified-by` | claim → agent | human sign-off; `meta` carries `claim_body_hash`, `signature`, `signer`, `signed_at` |
 | `derived-from` | node → node | lineage (e.g. extracted text → original PDF) |
 | `used` | step → artifact | W3C PROV activity-to-entity usage; Source Brief steps use one edge for each declared source and analysis artifact |
+| `contradicts` | artifact/claim → a different claim | contrary evidence the claim must face; `meta.reason` is non-blank text (missing or blank: warning `semantics.contradicts_no_reason`); other endpoints: error `semantics.contradicts_invalid` |
+| `supersedes` | old claim → a different new claim | an append-only correction; the engine writes `meta.reason`. A claim has at most one successor (`semantics.supersedes_ambiguous`), the chain has no cycle (`semantics.supersession_cycle`) and ends at a claim with a `supported-by` edge (`semantics.supersedes_no_successor`); other endpoints: `semantics.supersedes_invalid`. All are errors |
+
+The list is closed: the reference verifier reports any other `edge_type` as the error
+`semantics.edge_type_unknown`.
 
 ## Seal records
 
@@ -238,9 +253,13 @@ shape is fixed. Verifiers MUST NOT reject a step because its `tool` or schema is
 unknown: unknown steps are recorded, not judged. A schema whose shape changes gets a
 new version (`…/2`); old versions stay readable. New schemas are added to this table.
 
-Prefixes: `human/…` is a decision a person made (the record is signed by their key);
-`veridict/…` is the engine's own bookkeeping. A step that names a `model` is an **AI
-step**, whatever its `tool` (`veridict-verify --forbid-ai-steps` rejects them).
+Prefixes: `human/…` names a decision attributed to a person; `veridict/…` is the
+engine's own bookkeeping. Nothing checks the prefix itself. In an `enrolled/1` case the
+record must be signed by the person's own key only when the step's `agent` is a human
+agent (rule 4); the engine also lets a system key write a `human/…` step attributed to
+its own system agent, including `human/origin-assessment`, which changes confidence
+ceilings (see **Known gaps**). A step that names a `model` is an **AI step**, whatever
+its `tool` (`veridict-verify --forbid-ai-steps` rejects them).
 
 | `tool` | Params schema | What it records | Checked by the verifier |
 |---|---|---|---|
@@ -251,7 +270,7 @@ step**, whatever its `tool` (`veridict-verify --forbid-ai-steps` rejects them).
 | `veridict/folder-seal` | Artifact `capture_method: folder-inventory/1` | an inventory of a case folder and its changes | yes, with `--check-tree` |
 | `veridict/folder-import` | catalog Artifact `folder-catalog/2` with params `schema: veridict-folder-import/2`; receipt Artifact `import-receipt/1` | one revision of a level-two import: exact relative names → artifacts, changes, quarantine, register rows, filename hints, earlier checksum lists, capture times | recorded |
 | `veridict/tree-seal` | Artifact `folder-inventory/2` | the revision's `SHA256SUMS.txt` list (accepted and quarantined files) | yes, with `--check-tree` (see **Verifier versions**) |
-| `veridict/capture-record`, `veridict/search`, `veridict/source`, `veridict/command`, `veridict/journal-row` | `veridict-<kind>/1`: `row`, `time_basis`, `reference_status`; `basis` for searches; `corrects` when a row changed | one row of the owner's register as an Artifact `journal-entry`; `inputs` are the register file and, when the row's reference resolves, the referenced file | recorded |
+| `veridict/capture-record`, `veridict/search`, `veridict/source`, `veridict/command`, `veridict/journal-row` | `veridict-<kind>/1`: `row`, `time_basis`, `reference_status`; `basis` for searches; `corrects` when a row changed | one row of the owner's register as an Artifact `journal-entry`; `inputs` are the register file and, only when `reference_status` is `matched`, the referenced file (see **Register rows** below) | recorded |
 | `veridict/hash-list-check` | Artifact `checksum-reconciliation` | an earlier checksum list kept as its digest and reconciliation result, not its text | recorded |
 | `veridict/delivery` | `veridict-delivery/1` | that the analyst recorded handing one PDF and one ZIP to a recipient profile | yes: see **Deliveries** |
 | `veridict/timestamp` | — (`token`, `egress_ref`) | a token obtained later by `timestamp sync`, with the gateway's outgoing-request id | recorded |
@@ -265,6 +284,13 @@ step**, whatever its `tool` (`veridict-verify --forbid-ai-steps` rejects them).
 "Recorded" means the verifier checks the step's generic shape (`tool`, `params`,
 `inputs`, `outputs`) and that it is signed like every record, not the meaning of its
 params.
+
+**Register rows.** `reference_status` is `matched` when the row's file reference
+resolves to exactly one imported file and the row's `SHA256` column, if filled, equals
+that file's digest. A reference that resolves but whose stated digest differs is
+`digest-mismatch`: the file is not an input and is named only in the `resolved` field
+of the `journal-entry` content. The other values are `ambiguous` (more than one
+candidate), `missing` and `unrecorded` (no reference in the row).
 
 ## Deliveries
 
@@ -280,8 +306,10 @@ checks every `veridict/delivery` step, in any signer profile:
    `capture_method: delivery-record`, `media_type: application/json` and the canonical
    storage path.
 4. The receipt bytes are at most 1 MiB and match the Artifact's `sha256`. They parse
-   as strict JSON with a non-empty string `reference`, and equal the RFC 8785 bytes
-   of `{schema, recipient, pdf_sha256, zip_sha256, reference}` taken from the step.
+   as strict JSON with a string `reference` that is not blank (empty, or only
+   characters for which Python's `str.isspace()` is true, is refused), and equal the
+   RFC 8785 bytes of `{schema, recipient, pdf_sha256, zip_sha256, reference}` taken
+   from the step.
 5. `params.op_id` is `hash(["delivery", reference])`.
 
 Any failure is the error `delivery.receipt_invalid`.
@@ -296,7 +324,7 @@ Any failure is the error `delivery.receipt_invalid`.
 | `case.veridict.zip` | a snapshot export of an `enrolled/1` case (no seal record) |
 | `SHA256SUMS.txt` | the inventory; the same bytes are the `folder-inventory/2` Artifact |
 | `appendix-a.csv`, `receipt.txt`, `import-summary.json` | Appendix A, the import receipt (also the `import-receipt/1` Artifact), and a summary of changes and register issues |
-| `record.json` | `{state, signature}`: the signed state of this revision, with the bundle's SHA-256, the previous bundle's SHA-256 and the hashes of the files above |
+| `record.json` | `{state, signature}`: the signed state of this revision, with the bundle's SHA-256, the previous bundle's SHA-256 and the hashes of the files above. It is signed with the import key, which is also the case's founding key; the file does not name the key |
 
 Files that look like credentials are not copied: they appear as hashes in the
 quarantine list. A later revision keeps earlier evidence; a removed file needs a
@@ -305,6 +333,21 @@ reason. `veridict-verify --check-tree FOLDER` compares the folder with the bundl
 `folder-inventory/2` Artifact. `record.json` is checked by `veridict-seal`, not by
 `veridict-verify`. The import guide ships with the VERIDICT engine
 (`docs/level-two-import.md`).
+
+**Inventory bytes.** `folder-inventory/1`, `folder-inventory/2` and `SHA256SUMS.txt`
+are UTF-8 with one line per file: the SHA-256 as 64 lowercase hex, two spaces, the
+relative path, LF. Paths use `/`, have no empty, `.` or `..` segment and no
+duplicates, and are sorted by Unicode code point; the last line ends with LF.
+
+**`--check-tree`** runs only when the bundle has no other error; after an earlier error
+the folder is not compared and no `tree` finding appears. It walks FOLDER and skips
+files whose name starts with `~$` or is `thumbs.db`, `desktop.ini` or `.ds_store` in
+any letter case (the engine skips the same names when it seals). Each difference is a
+`tree.mismatch` error (`added: P`, `changed: P`, `missing: P`). A malformed inventory,
+a link, reparse point or offline placeholder, any other non-regular entry, two names
+that are equal after NFC normalisation and case folding, or a file that changes while
+it is read is `tree.unreadable`. Anything other than exactly one selected inventory is
+`tree.inventory_count`.
 
 ## Source Brief steps
 
@@ -350,7 +393,8 @@ A conforming verifier MUST:
 5. Re-hash every artifact object and compare with its node's `sha256`.
 6. Verify `verified-by` signatures against the signed claim's actual `body_hash`.
 7. Flag as **errors**: any hash/signature mismatch, missing objects, claims with no
-   `supported-by` edge, edges to nonexistent nodes.
+   `supported-by` edge, edges to nonexistent nodes, edge types not listed in **Edge
+   types**, and `contradicts` or `supersedes` edges that break the rules listed there.
 8. Flag as **warnings**: `single_source` claims, pending timestamps, unsigned manifest,
    unsigned records, unknown signers.
 9. Parse JSON strictly (I-JSON): reject duplicate member names, non-finite numbers and
@@ -362,8 +406,10 @@ A conforming verifier MUST:
     error and the file is not read.
 11. Before unpacking an archive, refuse members with unsafe names, symbolic links,
     duplicate names, and archives over a member-count or total-size limit.
-12. For an RFC 3161 token: refuse a response whose status is not granted; check that
-    the message imprint is the token's declared hash (SHA-256/384/512) of the
+12. For an RFC 3161 token: refuse a response whose PKIStatus is not 0 (`granted`).
+    `grantedWithMods` (1), which RFC 3161 counts as granted, is refused too
+    (`timestamps.token_not_granted`); 2 and above is `timestamps.tsa_refused`. Check
+    that the message imprint is the token's declared hash (SHA-256/384/512) of the
     artifact's raw SHA-256 digest (a SHA-256 token may also carry the digest itself).
     The TSA roots come from the **recipient**, never from the bundle. With roots:
     verify the token signature, the critical `timeStamping` key usage, and a
@@ -374,17 +420,23 @@ A conforming verifier MUST:
     (warning), anything else (error). Revocation cannot be checked offline and the
     report says so.
 13. Check every `veridict/delivery` step against its receipt (see **Deliveries**).
-14. When the manifest or the founding record names `enrolled/1`, apply the rules of
-    **Signer profiles**, with or without a pinned key.
+14. When the manifest names `enrolled/1`, apply the rules of **Signer profiles**, with
+    or without a pinned key. When the manifest and the founding record disagree about
+    the profile, report the error `keys.not_trusted`. The reference verifier switches
+    the rules on from the manifest only, so when only the founding record names
+    `enrolled/1` it reports that one error and not rules 2–6 (see **Known gaps**).
 
 **Pinned keys.** When the recipient pins one or more keys, identity problems become
 errors: an unsigned manifest, any unsigned record, and any signer (manifest, record,
 `verified-by`, content seal) that is neither pinned nor introduced by a valid
-`human/key-rotation` statement signed by an already-trusted key earlier in the chain,
-or, in an enrolled case, enrolled under **Signer profiles** rule 2 by a trusted human.
-Keys listed in the manifest must also be pinned or introduced that way, and a broken
-rotation statement is an error. Without a pinned key the verifier MUST state that the
-signer's identity was not checked.
+`human/key-rotation` statement signed by an already-trusted key or, in an enrolled
+case, enrolled under **Signer profiles** rule 2 by a trusted human. A record signer
+that is not pinned must have been introduced in an earlier record. The manifest
+signer, `verified-by` signers and content-seal signers are checked against the keys
+trusted at the end of the journal (see **Known gaps**). Keys listed in the manifest
+must also be pinned or introduced that way, and a broken rotation statement is an
+error. Without a pinned key the verifier MUST state that the signer's identity was not
+checked.
 
 Verdicts: `VALID` (no findings), `VALID WITH WARNINGS`, `INVALID` (any error).
 Reference exit codes: 0 / 2 / 1.
@@ -394,9 +446,18 @@ Reference exit codes: 0 / 2 / 1.
 Not every rule above is checked by the public release. "0.3.0" is `veridict-verify`
 0.3.0 on PyPI. "main" is the development verifier in the VERIDICT engine repository
 at the merge of M2 (engine commit `4c760f1`); it is not released yet. Work on
-historical release pins (M3) is in progress and not covered here. Every row was
-tested on a synthetic case with two analysts and a system key, built and verified
-with both verifiers by check scripts in the engine repository.
+historical release pins (M3) is in progress and not covered here.
+
+The rows on the manifest and key ids, signed records and manifest under a pinned key,
+the journal timestamp and `egress_ref`, `captured_at`, the new fields, **Signer
+profiles**, `manifest.signers`, **Deliveries** and `--check-tree` were tested on a
+synthetic case with two analysts and a system key, built and verified with both
+verifiers by check scripts in the engine repository. Those scripts make no key
+rotation, origin assessment, Source Brief, AI step or seal record (every bundle is a
+snapshot export). The rows on rotation handover, key rotation, origin assessment,
+Source Brief and the seal record body come from reading the code: that verifier code
+is the same in 0.3.0 and main (the one Source Brief change reads text spans as a
+stream). The AI-step policy is covered by the conformance case `ai-step-forbidden`.
 
 | Rule | 0.3.0 | main |
 |---|---|---|
@@ -406,11 +467,11 @@ with both verifiers by check scripts in the engine repository.
 | `chain_timestamp.egress_ref` | not read; an edit breaks `manifest_hash` | the same |
 | `captured_at` is a string | yes | yes |
 | key rotation, origin assessment, Source Brief, AI-step policy | yes | yes |
-| new fields `signers`, `signer_public`, `timestamp_egress_ref` | ignored; a bundle with them still opens | read where the rules need them |
+| new fields `signers`, `signer_public`, `timestamp_egress_ref` | ignored; a bundle with them still opens | `signers` is checked (rule 6); the other two are not read |
 | **Signer profiles** `enrolled/1`, rules 1–6 | **no** | yes: `keys.not_trusted`, `signatures.signer_not_trusted`, `semantics.verification_invalid` |
 | `manifest.signers` equals the journal | no | yes: `keys.not_trusted` |
 | **Deliveries** receipt check | no | yes: `delivery.receipt_invalid` |
-| `--check-tree` | **crashes**: `veridict_verify/tree.py` is missing from the 0.3.0 package | yes: `folder-inventory/1`, else the last `folder-inventory/2` |
+| `--check-tree` | **crashes** (`ModuleNotFoundError`: `veridict_verify/tree.py` is missing from the 0.3.0 package) whenever every earlier check passed, for example with no pin or on a single-signer import with its key pinned. After an earlier error (for example the founding key pinned on an enrolled bundle with more signers) the folder comparison is skipped without a message | yes: `folder-inventory/1`, else the last `folder-inventory/2`; skipped without a message after an earlier error |
 | seal record body | not checked | not checked |
 
 What this means for a recipient of an enrolled bundle (for example any level-two
@@ -427,6 +488,36 @@ import) who has only 0.3.0:
   a manifest that drops the profile.
 
 An enrolled bundle therefore needs a verifier newer than 0.3.0.
+
+### Known gaps (to be fixed in the engine/verifier)
+
+This page describes what main does. In four places that falls short of what the format
+intends. Each fix is tracked for the engine owner; until it lands, a recipient should
+read verdicts with these limits.
+
+1. **A `human/…` step need not be signed by a person.** Rule 4 looks at the step's
+   `agent`, not its `tool`. The engine lets a system key write a `human/…` step
+   attributed to its own system agent, and the verifier accepts it, pinned or not.
+   *Effect:* a system account can record a `human/origin-assessment` that marks two
+   sources independent and so raises a confidence ceiling. Check that the step's
+   `agent` is a human agent before reading it as a person's decision.
+2. **Content seals are checked against the keys trusted at the end of the journal**,
+   not at the artifact's record. *Effect:* with a pinned key, a standalone seal passes
+   when its key was enrolled or rotated in only after the artifact was written. The
+   record itself must still be signed by a key trusted at that point, and the engine
+   always seals with the record's signer, so engine output is unaffected. The same
+   applies to `verified-by` signers after a rotation in the single-investigator
+   profile (rule 5 covers enrolled cases). 0.3.0 has the rotation half of this gap too.
+3. **`enrolled/1` is switched on only by the manifest.** When only the founding record
+   names it, the verifier reports the mismatch (`keys.not_trusted`, so `INVALID`) and
+   skips rules 2–6. *Effect:* the verdict is right, but the findings are incomplete:
+   other rule breaks go unreported, and with a pin the correctly enrolled keys are
+   reported as untrusted.
+4. **A level-two import's `imported_at` is not in the `Z`, second-precision form**
+   (for example `2026-11-25T22:05:02.863920+00:00`, in the `folder-catalog/2` content
+   and the `import-receipt/1` text). *Effect:* the value is still RFC 3339 UTC and no
+   verdict changes, but a reader that parses the catalog strictly by **Times** rejects
+   it.
 
 ## Capture methods
 
@@ -454,7 +545,9 @@ UTF-8 string `sha256:<64 lowercase hex>`. A conforming verifier MUST:
 
 - when both fields are present: verify the signature against a manifest public key
   (mismatch = error; unknown signer = warning, or an error when a key is pinned; with a
-  pinned key the signer must also be trusted, as for records);
+  pinned key the signer must also be trusted, which the reference verifier checks
+  against the keys trusted at the end of the journal, not at the artifact's record:
+  see **Known gaps**);
 - when both are absent: emit a warning (`artifact has no standalone content signature`)
   so older bundles remain valid.
 
