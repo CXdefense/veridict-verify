@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.1
+
+**Upgrade if you use `--check-tree`.** No other check changed.
+
+### Fixed
+
+- `--check-tree` crashed because `veridict_verify/tree.py` was not packaged. Every run
+  on a bundle without earlier errors stopped with `ModuleNotFoundError` and exit 1,
+  the same exit code as `INVALID`, so a script reading only the exit code took a
+  crash for a verdict. 0.3.1 ships the module and reports `tree.matched`,
+  `tree.mismatch` (added, changed or missing files), `tree.inventory_count` or
+  `tree.unreadable`.
+- `--check-tree` on a level-two import (`veridict-seal import`): such a bundle has no
+  `folder-inventory/1` Artifact, only `folder-inventory/2`. 0.3.0 with the module
+  added would still have reported `tree.inventory_count`; 0.3.1 compares the folder
+  with the last `folder-inventory/2` Artifact when there is no `folder-inventory/1`,
+  as `docs/bundle-format.md` describes.
+
+### Release checks
+
+- The release workflow runs the installed wheel's `veridict-verify --check-tree`
+  (`scripts/check_tree_smoke.py`), with and without the `timestamps` extra, and
+  requires a report without a traceback. CI runs the same script on every push.
+- `tests/test_package_imports.py` imports every `veridict_verify` module the package
+  refers to, lazy imports included, from the installed copy.
+- `tests/fixtures/tree/`: a synthetic folder seal, a level-two import and their
+  folder, for match and mismatch tests.
+
+Signer profiles (`enrolled/1`), the delivery receipt check and the other rules marked
+"no" for 0.3.0 under **Verifier versions** in `docs/bundle-format.md` are not in
+0.3.1; they are planned for 0.4.0.
+
 ## 0.3.0
 
 **Upgrade if you use `--trusted-key` or rely on RFC-3161 tokens.** Versions 0.2.x
@@ -39,6 +71,8 @@ accept bundles that 0.3.0 rejects.
 - `--forbid-ai-steps` makes every step that names an AI model an error
   (`policy.ai_step_forbidden`), for cases where AI is not allowed.
 - `--check-tree <folder>` and `--require-head-timestamp` for VERIDICT folder seals.
+  (`--check-tree` crashed in 0.3.0 because a module was missing from the package;
+  fixed in 0.3.1.)
 - A conformance corpus in `tests/conformance/`: 20 synthetic cases with the exact
   verdict and codes a correct verifier must report (`cases.json`). 0.2.0 gets 4 of the
   runnable cases wrong.

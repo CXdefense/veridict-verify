@@ -392,11 +392,13 @@ Reference exit codes: 0 / 2 / 1.
 ## Verifier versions
 
 Not every rule above is checked by the public release. "0.3.0" is `veridict-verify`
-0.3.0 on PyPI. "main" is the development verifier in the VERIDICT engine repository
+0.3.0 on PyPI. 0.3.1 changes only the `--check-tree` row; every other row is the
+same as for 0.3.0. "main" is the development verifier in the VERIDICT engine repository
 at the merge of M2 (engine commit `4c760f1`); it is not released yet. Work on
 historical release pins (M3) is in progress and not covered here. Every row was
 tested on a synthetic case with two analysts and a system key, built and verified
-with both verifiers by check scripts in the engine repository.
+with both verifiers by check scripts in the engine repository. The 0.3.1
+`--check-tree` entry is tested by `tests/test_check_tree.py` in this repository.
 
 | Rule | 0.3.0 | main |
 |---|---|---|
@@ -410,11 +412,11 @@ with both verifiers by check scripts in the engine repository.
 | **Signer profiles** `enrolled/1`, rules 1–6 | **no** | yes: `keys.not_trusted`, `signatures.signer_not_trusted`, `semantics.verification_invalid` |
 | `manifest.signers` equals the journal | no | yes: `keys.not_trusted` |
 | **Deliveries** receipt check | no | yes: `delivery.receipt_invalid` |
-| `--check-tree` | **crashes**: `veridict_verify/tree.py` is missing from the 0.3.0 package | yes: `folder-inventory/1`, else the last `folder-inventory/2` |
+| `--check-tree` | **crashes**: `veridict_verify/tree.py` is missing from the 0.3.0 package. 0.3.1: yes, `folder-inventory/1`, else the last `folder-inventory/2` | yes: `folder-inventory/1`, else the last `folder-inventory/2` |
 | seal record body | not checked | not checked |
 
 What this means for a recipient of an enrolled bundle (for example any level-two
-import) who has only 0.3.0:
+import) who has only 0.3.0 (the same holds for 0.3.1):
 
 - **With the founding key pinned**, 0.3.0 marks a *correct* bundle with a second analyst
   or a system key `INVALID` (`signatures.signer_not_trusted`, `keys.not_trusted`,
@@ -426,7 +428,8 @@ import) who has only 0.3.0:
   enrolling another key or verifying a claim, a system step attributed to an analyst,
   a manifest that drops the profile.
 
-An enrolled bundle therefore needs a verifier newer than 0.3.0.
+An enrolled bundle therefore needs a verifier with signer profiles: main, or a
+release after 0.3.1 (planned for 0.4.0). 0.3.1 does not add them.
 
 ## Capture methods
 
