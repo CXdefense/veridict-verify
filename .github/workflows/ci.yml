@@ -15,10 +15,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install package
-        run: pip install . pytest
+      - name: Install package with timestamp support
+        run: pip install ".[timestamps]" pytest
       - name: Conformance tests (engine-independent)
         run: pytest tests -q
+      - name: Every conformance case, nothing skipped
+        run: python scripts/check_conformance.py
       - name: Verify demo bundle (integrity must hold)
         shell: bash
         run: |
@@ -57,3 +59,31 @@ jobs:
             exit 1
           fi
           echo "tamper detected correctly"
+
+  base-install:
+    # Without the [timestamps] extra: timestamp cases are skipped, and pinned TSA roots
+    # must make the verdict INVALID instead of passing unchecked.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package without extras
+        run: pip install . pytest
+      - name: Tests
+        run: pytest tests -q
+      - name: Conformance cases that need no extra
+        run: python scripts/check_conformance.py --skip-timestamps
+      - name: Pinned TSA roots without timestamp support are INVALID
+        shell: bash
+        run: |
+          set +e
+          out=$(veridict-verify tests/conformance/tsa-genuine.veridict.zip --tsa-roots tests/conformance/tsa-roots/genuine-root.pem)
+          code=$?
+          set -e
+          echo "$out"
+          if [ "$code" -ne 1 ] || ! grep -q "timestamps.support_missing" <<<"$out"; then
+            echo "expected INVALID with timestamps.support_missing (exit $code)"
+            exit 1
+          fi

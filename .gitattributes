@@ -1,0 +1,6 @@
+# Byte-exact test material: hashes and signatures cover these bytes, so Git must
+# never convert their line endings (core.autocrlf=true on Windows would).
+tests/fixtures/** -text
+tests/conformance/** -text
+examples/** -text
+*.veridict.zip binary
