@@ -113,6 +113,13 @@ veridict-verify seal.veridict.zip --trusted-key <fp> --tsa-roots roots.pem \
   --require-head-timestamp --check-tree ./case
 ```
 
+The report lists added, changed and missing files (`tree.mismatch`). A level-two
+import (`veridict-seal import`) works the same way: its folder is compared with the
+revision's `SHA256SUMS.txt` inventory. If an import was signed by more than one key,
+read **Verifier versions** in [docs/bundle-format.md](docs/bundle-format.md) first.
+`--check-tree` needs 0.3.1 or later; in 0.3.0 it crashed because a module was missing
+from the package.
+
 ### Limits
 
 `--max-files N` and `--max-bytes N` cap how much of an untrusted archive is unpacked

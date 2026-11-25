@@ -447,7 +447,8 @@ Reference exit codes: 0 / 2 / 1.
 ## Verifier versions
 
 Not every rule above is checked by the public release. "0.3.0" is `veridict-verify`
-0.3.0 on PyPI. "main" is the development verifier in the VERIDICT engine repository
+0.3.0 on PyPI. 0.3.1 changes only the `--check-tree` row; every other row is the
+same as for 0.3.0. "main" is the development verifier in the VERIDICT engine repository
 at the merge of M2 (engine commit `4c760f1`); it is not released yet. Work on
 historical release pins (M3) is in progress and not covered here.
 
@@ -461,6 +462,8 @@ snapshot export). The rows on rotation handover, key rotation, origin assessment
 Source Brief and the seal record body come from reading the code: that verifier code
 is the same in 0.3.0 and main (the one Source Brief change reads text spans as a
 stream). The AI-step policy is covered by the conformance case `ai-step-forbidden`.
+The 0.3.1 `--check-tree` entry is tested by `tests/test_check_tree.py` in this
+repository.
 
 | Rule | 0.3.0 | main |
 |---|---|---|
@@ -474,11 +477,11 @@ stream). The AI-step policy is covered by the conformance case `ai-step-forbidde
 | **Signer profiles** `enrolled/1`, rules 1–6 | **no** | yes: `keys.not_trusted`, `signatures.signer_not_trusted`, `semantics.verification_invalid` |
 | `manifest.signers` equals the journal | no | yes: `keys.not_trusted` |
 | **Deliveries** receipt check | no | yes: `delivery.receipt_invalid` |
-| `--check-tree` | **crashes** (`ModuleNotFoundError`: `veridict_verify/tree.py` is missing from the 0.3.0 package) whenever every earlier check passed, for example with no pin or on a single-signer import with its key pinned. After an earlier error (for example the founding key pinned on an enrolled bundle with more signers) the folder comparison is skipped without a message | yes: `folder-inventory/1`, else the last `folder-inventory/2`; skipped without a message after an earlier error |
+| `--check-tree` | 0.3.0 **crashes** (`ModuleNotFoundError`: `veridict_verify/tree.py` is missing from the 0.3.0 package) whenever every earlier check passed, for example with no pin or on a single-signer import with its key pinned. After an earlier error (for example the founding key pinned on an enrolled bundle with more signers) the folder comparison is skipped without a message. 0.3.1: yes, `folder-inventory/1`, else the last `folder-inventory/2`; skipped without a message after an earlier error | yes: `folder-inventory/1`, else the last `folder-inventory/2`; skipped without a message after an earlier error |
 | seal record body | not checked | not checked |
 
 What this means for a recipient of an enrolled bundle (for example any level-two
-import) who has only 0.3.0:
+import) who has only 0.3.0 (the same holds for 0.3.1):
 
 - **With the founding key pinned**, 0.3.0 marks a *correct* bundle with a second analyst
   or a system key `INVALID` (`signatures.signer_not_trusted`, `keys.not_trusted`,
@@ -490,7 +493,8 @@ import) who has only 0.3.0:
   enrolling another key or verifying a claim, a system step attributed to an analyst,
   a manifest that drops the profile.
 
-An enrolled bundle therefore needs a verifier newer than 0.3.0.
+An enrolled bundle therefore needs a verifier with signer profiles: main, or a
+release after 0.3.1 (planned for 0.4.0). 0.3.1 does not add them.
 
 ### Known gaps (to be fixed in the engine/verifier)
 
@@ -510,7 +514,7 @@ read verdicts with these limits.
    record itself must still be signed by a key trusted at that point, and the engine
    always seals with the record's signer, so engine output is unaffected. The same
    applies to `verified-by` signers after a rotation in the single-investigator
-   profile (rule 5 covers enrolled cases). 0.3.0 has the rotation half of this gap too.
+   profile (rule 5 covers enrolled cases). 0.3.0 and 0.3.1 have the rotation half of this gap too.
 3. **`enrolled/1` is switched on only by the manifest.** When only the founding record
    names it, the verifier reports the mismatch (`keys.not_trusted`, so `INVALID`) and
    skips rules 2–6. *Effect:* the verdict is right, but the findings are incomplete:

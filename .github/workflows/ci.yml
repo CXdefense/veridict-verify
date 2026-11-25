@@ -21,6 +21,8 @@ jobs:
         run: pytest tests -q
       - name: Every conformance case, nothing skipped
         run: python scripts/check_conformance.py
+      - name: The installed command runs --check-tree without a traceback
+        run: python scripts/check_tree_smoke.py
       - name: Verify demo bundle (integrity must hold)
         shell: bash
         run: |
@@ -87,3 +89,38 @@ jobs:
             echo "expected INVALID with timestamps.support_missing (exit $code)"
             exit 1
           fi
+      - name: The installed command runs --check-tree without a traceback
+        run: python scripts/check_tree_smoke.py
+
+  wheel-gate:
+    # The release workflow's verify-wheel checks, run on every push so they are known to
+    # pass before a tag: build the wheel, install it in clean venvs as users will, and
+    # check what is installed. 0.3.0 was released without veridict_verify/tree.py.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist and wheel
+        run: |
+          pip install build
+          python -m build
+      - name: Wheel with [timestamps]
+        shell: bash
+        run: |
+          python -m venv /tmp/full
+          /tmp/full/bin/pip install "$(ls dist/*.whl)[timestamps]" pytest
+          /tmp/full/bin/python scripts/check_conformance.py
+          /tmp/full/bin/python -m pytest tests -q -p no:cacheprovider
+          /tmp/full/bin/python -m pytest tests/test_package_imports.py -q -p no:cacheprovider
+          /tmp/full/bin/python scripts/check_tree_smoke.py --cli /tmp/full/bin/veridict-verify
+      - name: Base wheel
+        shell: bash
+        run: |
+          python -m venv /tmp/base
+          /tmp/base/bin/pip install "$(ls dist/*.whl)" pytest
+          /tmp/base/bin/python scripts/check_conformance.py --skip-timestamps
+          /tmp/base/bin/python -m pytest tests/test_package_imports.py tests/test_check_tree.py \
+            -q -p no:cacheprovider
+          /tmp/base/bin/python scripts/check_tree_smoke.py --cli /tmp/base/bin/veridict-verify

@@ -14,3 +14,6 @@ tested without the engine.
 
 Regeneration lives with the engine (`scripts/make_conformance_fixtures.py`);
 each tampered variant changes exactly one thing relative to `valid.veridict.zip`.
+
+`tree/` holds a folder seal, a level-two import and the folder they were made from,
+for `--check-tree`; see `tree/README.md`.
