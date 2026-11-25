@@ -154,7 +154,35 @@ A conforming verifier MUST:
 7. Flag as **errors**: any hash/signature mismatch, missing objects, claims with no
    `supported-by` edge, edges to nonexistent nodes.
 8. Flag as **warnings**: `single_source` claims, pending timestamps, unsigned manifest,
-   unknown signers.
+   unsigned records, unknown signers.
+9. Parse JSON strictly (I-JSON): reject duplicate member names, non-finite numbers and
+   integers outside ±(2^53−1).
+10. Treat every path taken from bundle data as untrusted. An artifact's
+    `storage_path` MUST equal `objects/sha256/<first 2 hex>/<sha256>`. `timestamp_ref`
+    and `timestamp_ots_ref` MUST be plain relative paths inside the bundle (no absolute
+    paths, drive letters, backslashes, `.`/`..` segments or colons). Anything else is an
+    error and the file is not read.
+11. Before unpacking an archive, refuse members with unsafe names, symbolic links,
+    duplicate names, and archives over a member-count or total-size limit.
+12. For an RFC 3161 token: refuse a response whose status is not granted; check that
+    the message imprint is the token's declared hash (SHA-256/384/512) of the
+    artifact's raw SHA-256 digest (a SHA-256 token may also carry the digest itself).
+    The TSA roots come from the **recipient**, never from the bundle. With roots:
+    verify the token signature, the critical `timeStamping` key usage, and a
+    certificate chain from the signer to a pinned root that is valid at `genTime`.
+    Certificates carried inside the token may only serve as intermediates; a root
+    the token brings along is never trusted. Report one of three outcomes: verified
+    to a pinned root (information), no roots given so only the imprint was matched
+    (warning), anything else (error). Revocation cannot be checked offline and the
+    report says so.
+
+**Pinned keys.** When the recipient pins one or more keys, identity problems become
+errors: an unsigned manifest, any unsigned record, and any signer (manifest, record,
+`verified-by`, content seal) that is neither pinned nor introduced by a valid
+`human/key-rotation` statement signed by an already-trusted key earlier in the chain.
+Keys listed in the manifest must also be pinned or introduced that way, and a broken
+rotation statement is an error. Without a pinned key the verifier MUST state that the
+signer's identity was not checked.
 
 Verdicts: `VALID` (no findings), `VALID WITH WARNINGS`, `INVALID` (any error).
 Reference exit codes: 0 / 2 / 1.

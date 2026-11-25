@@ -1,0 +1,338 @@
+{
+  "schema": "veridict-conformance/1",
+  "note": "Synthetic bundles. Options name files relative to this folder; trusted_keys entries name keys/<name>.fingerprint. Info findings are not part of the expectations.",
+  "cases": [
+    {
+      "name": "valid",
+      "bundle": "valid.veridict.zip",
+      "mutation": "none",
+      "options": {},
+      "requires": [],
+      "verdict": "VALID WITH WARNINGS",
+      "errors": [],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "valid-pinned",
+      "bundle": "valid.veridict.zip",
+      "mutation": "none (the analyst key is pinned)",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ]
+      },
+      "requires": [],
+      "verdict": "VALID WITH WARNINGS",
+      "errors": [],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "valid-pinned-accepting-pending",
+      "bundle": "valid.veridict.zip",
+      "mutation": "none; the recipient accepts pending timestamps",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ],
+        "allow_warnings": [
+          "timestamps.pending"
+        ]
+      },
+      "requires": [],
+      "verdict": "VALID",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "tampered-object",
+      "bundle": "tampered-object.veridict.zip",
+      "mutation": "first byte of a stored object flipped",
+      "options": {},
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "artifacts.hash_mismatch"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "forged-record",
+      "bundle": "forged-record.veridict.zip",
+      "mutation": "the claim text edited in the journal, hashes left as they were",
+      "options": {},
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "chain.body_hash_mismatch",
+        "semantics.verification_hash_mismatch"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "deleted-record",
+      "bundle": "deleted-record.veridict.zip",
+      "mutation": "one journal record removed",
+      "options": {},
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "chain.prev_mismatch",
+        "chain.seq_mismatch",
+        "corroboration.claim_invalid",
+        "semantics.edge_target_missing"
+      ],
+      "warnings": [
+        "chain.record_count_mismatch",
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "forged-manifest-head",
+      "bundle": "forged-manifest-head.veridict.zip",
+      "mutation": "manifest chain_head replaced",
+      "options": {},
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "chain.head_mismatch",
+        "manifest.hash_mismatch"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "swapped-public-key",
+      "bundle": "swapped-public-key.veridict.zip",
+      "mutation": "manifest public key replaced with an attacker key",
+      "options": {},
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "artifacts.content_signature_invalid",
+        "manifest.hash_mismatch",
+        "manifest.key_id_mismatch",
+        "manifest.signature_invalid",
+        "semantics.verification_invalid",
+        "signatures.record_invalid"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "stripped-signatures-pinned",
+      "bundle": "stripped-signatures.veridict.zip",
+      "mutation": "claim changed, human verification dropped, every signature and key removed, hashes recomputed; the analyst key is pinned",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ]
+      },
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "artifacts.content_signer_unknown",
+        "keys.no_pinned_key",
+        "manifest.unsigned",
+        "signatures.record_unsigned"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "stripped-signatures-unpinned",
+      "bundle": "stripped-signatures.veridict.zip",
+      "mutation": "the same bundle without a pinned key: identity is not checked",
+      "options": {},
+      "requires": [],
+      "verdict": "VALID WITH WARNINGS",
+      "errors": [],
+      "warnings": [
+        "artifacts.content_signer_unknown",
+        "manifest.unsigned",
+        "signatures.records_unsigned",
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "added-signer-pinned",
+      "bundle": "added-signer.veridict.zip",
+      "mutation": "claim changed and every record re-signed by an added attacker key",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ]
+      },
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "keys.not_trusted",
+        "manifest.signer_not_trusted",
+        "signatures.signer_not_trusted"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "storage-path-outside",
+      "bundle": "storage-path-outside.veridict.zip",
+      "mutation": "an artifact's storage_path set to an absolute path outside the bundle (journal re-signed by the analyst)",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ]
+      },
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "artifacts.path_not_content_address"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "duplicate-json-member",
+      "bundle": "duplicate-json-member.veridict.zip",
+      "mutation": "manifest.json with a duplicated member name",
+      "options": {},
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "manifest.unreadable"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "unsafe-archive-member",
+      "bundle": "unsafe-archive-member.veridict.zip",
+      "mutation": "an archive member named ../escape.txt",
+      "options": {},
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "archive.unsafe_name"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "ai-step-forbidden",
+      "bundle": "valid.veridict.zip",
+      "mutation": "none; the recipient forbids AI steps (the bundle has one)",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ],
+        "forbid_ai_steps": true
+      },
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "policy.ai_step_forbidden"
+      ],
+      "warnings": [
+        "timestamps.pending"
+      ]
+    },
+    {
+      "name": "tsa-genuine",
+      "bundle": "tsa-genuine.veridict.zip",
+      "mutation": "an RFC 3161 token from the test TSA; its root is pinned",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ],
+        "tsa_roots": "tsa-roots/genuine-root.pem"
+      },
+      "requires": [
+        "timestamps"
+      ],
+      "verdict": "VALID",
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "tsa-genuine-no-roots",
+      "bundle": "tsa-genuine.veridict.zip",
+      "mutation": "the same token without pinned TSA roots",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ]
+      },
+      "requires": [
+        "timestamps"
+      ],
+      "verdict": "VALID WITH WARNINGS",
+      "errors": [],
+      "warnings": [
+        "timestamps.tsa_not_checked"
+      ]
+    },
+    {
+      "name": "tsa-fake",
+      "bundle": "tsa-fake.veridict.zip",
+      "mutation": "a token from a TSA under another root",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ],
+        "tsa_roots": "tsa-roots/genuine-root.pem"
+      },
+      "requires": [
+        "timestamps"
+      ],
+      "verdict": "INVALID",
+      "errors": [
+        "timestamps.tsa_untrusted"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "tsa-smuggled-root",
+      "bundle": "tsa-smuggled-root.veridict.zip",
+      "mutation": "a fake TSA token that carries its own root",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ],
+        "tsa_roots": "tsa-roots/genuine-root.pem"
+      },
+      "requires": [
+        "timestamps"
+      ],
+      "verdict": "INVALID",
+      "errors": [
+        "timestamps.tsa_untrusted"
+      ],
+      "warnings": []
+    },
+    {
+      "name": "tsa-refused",
+      "bundle": "tsa-refused.veridict.zip",
+      "mutation": "a TSA refusal stored as if it were a token",
+      "options": {
+        "trusted_keys": [
+          "analyst"
+        ]
+      },
+      "requires": [],
+      "verdict": "INVALID",
+      "errors": [
+        "timestamps.tsa_refused"
+      ],
+      "warnings": []
+    }
+  ]
+}

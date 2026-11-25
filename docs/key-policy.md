@@ -44,9 +44,23 @@ veridict-verify case.veridict.zip --trusted-key <full-fingerprint>
 veridict-verify case.veridict.zip --trusted-key ./alice.fingerprint
 ```
 
-When `--trusted-key` is set, any manifest signer not in the trusted set is an **error**
-(`INVALID`). Without the flag, the verifier still checks signatures against keys
-embedded in the bundle but cannot assert identity.
+When `--trusted-key` is set (verifier 0.3.0 and later), the bundle is `INVALID` unless:
+
+- the manifest is signed;
+- every record in `graph/log.jsonl` is signed;
+- every signer — of the manifest, of records, of `verified-by` edges and of content
+  seals — is a pinned key, or a key that a pinned key handed over to in a valid
+  `human/key-rotation` statement **earlier in the chain**;
+- every key listed in the manifest is pinned or introduced that way;
+- every key-rotation statement verifies.
+
+Pin the key the case started with (or every key you trust). Pinning only the newest
+key does not vouch for records signed before the rotation.
+
+Without the flag, the verifier still checks signatures against keys embedded in the
+bundle but cannot assert identity. It says so in its first finding and warns about
+unsigned records. Before 0.3.0 a pinned key only compared the keys the manifest
+listed, so a bundle with every signature stripped still passed.
 
 ## Rotation
 

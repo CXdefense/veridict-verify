@@ -1,6 +1,6 @@
 [project]
 name = "veridict-verify"
-version = "0.2.0"
+version = "0.3.0"
 description = "Standalone offline verifier for VERIDICT case bundles. Free and open: trust, but re-check."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-timestamps = ["rfc3161-client>=1.0", "certifi"]
+timestamps = ["rfc3161-client>=1.0.9", "certifi"]
 
 [project.urls]
 Homepage = "https://github.com/CXdefense/veridict-verify"

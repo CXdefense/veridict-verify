@@ -22,8 +22,54 @@ jobs:
           name: dist
           path: dist/
 
-  publish:
+  verify-wheel:
+    # Gate between build and publish: install the wheel exactly as users will and run
+    # the whole conformance corpus against it, with and without the [timestamps] extra.
     needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: The wheel's version matches the tag
+        shell: bash
+        run: |
+          wheel=$(ls dist/*.whl)
+          case "$wheel" in
+            *"-${GITHUB_REF_NAME#v}-"*) echo "ok: $wheel" ;;
+            *) echo "wheel $wheel does not match tag $GITHUB_REF_NAME"; exit 1 ;;
+          esac
+      - name: Wheel with [timestamps] passes all 20 conformance cases
+        shell: bash
+        run: |
+          python -m venv /tmp/full
+          /tmp/full/bin/pip install "$(ls dist/*.whl)[timestamps]" pytest
+          /tmp/full/bin/python scripts/check_conformance.py
+          /tmp/full/bin/python -m pytest tests -q -p no:cacheprovider
+      - name: Base wheel refuses pinned TSA roots it cannot check
+        shell: bash
+        run: |
+          python -m venv /tmp/base
+          /tmp/base/bin/pip install "$(ls dist/*.whl)"
+          /tmp/base/bin/python scripts/check_conformance.py --skip-timestamps
+          set +e
+          out=$(/tmp/base/bin/veridict-verify tests/conformance/tsa-genuine.veridict.zip \
+                --tsa-roots tests/conformance/tsa-roots/genuine-root.pem)
+          code=$?
+          set -e
+          echo "$out"
+          if [ "$code" -ne 1 ] || ! grep -q "timestamps.support_missing" <<<"$out"; then
+            echo "expected INVALID with timestamps.support_missing (exit $code)"
+            exit 1
+          fi
+
+  publish:
+    needs: [build, verify-wheel]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
